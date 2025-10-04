@@ -1,0 +1,83 @@
+#						Emacs please make this -*- R -*-
+# Rprofile.site for R on hake-precision
+#
+# This file should be located at /etc/R/Rprofile.site
+#
+# see help(Startup) for documentation on ~/.Rprofile and Rprofile.site
+
+# We set the cloud mirror, which is 'network-close' to everybody, as default
+local({
+    r <- getOption("repos")
+    r["CRAN"] <- "https://cloud.r-project.org"
+    options(repos = r)
+    Sys.setenv(PATH = paste0("/usr/local/texlive/2024/bin/x86_64-linux:", Sys.getenv("PATH")))
+})
+
+# This function runs on startup of R
+.First <- function(){
+  hr <- lubridate::hour(lubridate::now())
+  cat("\n")
+  csasdown:::notify(
+    csasdown:::completed_message_color(
+      paste0("Good ", ifelse(hr < 12,
+                              "morning ",
+                              ifelse(hr < 6,
+                                     "afternoon ",
+                                     "evening ")),
+				     "!\n")))
+  csasdown:::notify("Print the working directory with pwd.")
+  csasdown:::notify("Print the home directory for the current package with here.")
+  csasdown:::notify("Change directories using cd() with a quoted or unquoted directory name.\n")
+  csasdown:::check_notify("Current directory is: ", getwd(), "\n")
+}
+
+# fancy quotes are annoying and lead to 'copy + paste' bugs / frustrations
+options(useFancyQuotes = FALSE)
+
+# enable autocompletions for package names in
+# `require()`, `library()`
+utils::rc.settings(ipck = TRUE)
+
+# Run getwd() without parens, like in the shell (just type pwd)
+pwd <- ""
+class(pwd) <- "__pwd__"
+print.__pwd__ <- \(x, ...) print(getwd())
+
+# Run here::dr_here() without class or parens (just type here)
+here <- ""
+class(here) <- "__here__"
+print.__here__ <- \(x, ...) cat(here::dr_here())
+
+# Change directories with or without quoting the directory name `directory`
+cd <- \(directory){
+  dr <- rlang::as_label(rlang::enquo(directory))
+  dr <- gsub("\"", "", dr)
+  if(dr == "<empty>"){
+   cat("No directory name supplied, staying in directory", getwd())
+   return(invisible())
+  }
+  if(!dir.exists(dr)){
+    cat(paste0("The `", dr, "` directory does not exist.\n"))
+    cat("Current directory is:", getwd(), "\n")
+    cat("Subdirectories in this directory are:\n",
+        paste(list.dirs(recursive = FALSE),
+	      collapse = " "))
+    return(invisible())
+  }
+  setwd(dr)
+  cat("Changed to directory ", getwd())
+}
+
+if(length(.libPaths()) > 1){
+  msg <- csasdown:::message_color("Using libraries in these paths:\n")
+}else{
+  msg <- csasdown:::message_color("Using libraries in this path:\n")
+}
+libs <- csasdown:::tag_color(paste("-", .libPaths(), collapse = "\n"))
+csasdown:::notify(csasdown:::completed_message_color(
+  paste0(msg, libs)))
+
+# Settings for BLAS
+RhpcBLASctl::blas_set_num_threads(1)
+RhpcBLASctl::omp_set_num_threads(1)
+
